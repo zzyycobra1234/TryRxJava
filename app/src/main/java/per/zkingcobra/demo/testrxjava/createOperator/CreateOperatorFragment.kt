@@ -4,14 +4,16 @@ import android.annotation.SuppressLint
 import android.util.Log
 import com.jakewharton.rxbinding3.view.clicks
 import io.reactivex.Observable
-import io.reactivex.Observer
+import io.reactivex.ObservableSource
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
-import io.reactivex.observers.DisposableObserver
+import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.fragment_create_operator.*
 import per.zkingcobra.demo.testrxjava.R
 import per.zkingcobra.demo.testrxjava.base.BaseFragment
+import java.util.concurrent.Callable
 import java.util.concurrent.TimeUnit
+
 
 class CreateOperatorFragment : BaseFragment() {
 
@@ -75,7 +77,6 @@ class CreateOperatorFragment : BaseFragment() {
 
 
         intervalRange.clicks().doOnNext {
-
             intervalObservable = Observable.intervalRange(1, 5, 1, 1, TimeUnit.SECONDS)
                 .observeOn(AndroidSchedulers.mainThread())
                 .doOnNext {
@@ -87,8 +88,79 @@ class CreateOperatorFragment : BaseFragment() {
 
 
 
+        create.clicks().doOnNext {
+            createObservables()
+        }.subscribe()
+
+        defer.clicks().doOnNext {
+            defer()
+        }.subscribe()
+
+
+
+        timer.clicks().doOnNext {
+            println(System.currentTimeMillis())
+            Observable.timer(3, TimeUnit.SECONDS)
+                .observeOn(AndroidSchedulers.mainThread())
+                .doOnNext {
+                    println(System.currentTimeMillis())
+                    showContent.text = "${showContent.text}\n" + System.currentTimeMillis()
+                }.subscribe()
+        }
+            .subscribe()
+
+
+
         clear.clicks().doOnNext { showContent.text = "" }.subscribe()
     }
+
+    private fun createObservables() {
+        Observable.create<String> {
+            Thread(Runnable {
+                it.onNext("我是异步回调")
+                Thread.sleep(1000)
+                it.onNext("我是异步回调二")
+                Thread.sleep(2000)
+                it.onNext("我是异步回调三")
+                println(" 当前线程 Thread " + Thread.currentThread().toString())
+            }).start()
+            println(" 当前线程 Observable " + Thread.currentThread().toString())
+        }.subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .doOnNext {
+                println(" 当前线程 mainThread " + Thread.currentThread().toString())
+                showContent.text = "${showContent.text}\n$it +"
+            }
+            .subscribe()
+    }
+
+
+    private fun defer() {
+        println(" 当前线程 defer " + Thread.currentThread().toString())
+
+
+        val observable = Observable.defer {
+            println(" 当前线程 defer observable " + Thread.currentThread().toString())
+
+            val time = System.currentTimeMillis()
+            Observable.just(time)
+        }
+
+        observable.subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread()).subscribe { time ->
+            println(" 当前线程 defer 1 " + Thread.currentThread().toString())
+            showContent.text = "${showContent.text}\n$time +"
+        }
+
+        Thread.sleep(1000)
+
+        observable.subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
+            .subscribe { time ->
+                println(" 当前线程 defer 2 " + Thread.currentThread().toString())
+                showContent.text = "${showContent.text}\n$time +"
+            }
+
+    }
+
 
     companion object {
 
